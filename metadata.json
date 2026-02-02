@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Xueqiu Tracker AI",
+  "description": "A portfolio tracking dashboard that calculates daily changes (adds/removes) in stock lists and uses Gemini to analyze the investment strategy shifts. Supports historical timelines and local data persistence.",
+  "requestFramePermissions": []
+}
