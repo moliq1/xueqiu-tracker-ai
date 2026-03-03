@@ -1,13 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { PortfolioChange, AIAnalysisResult } from "../types";
 
-// Safety check for API Key
 const apiKey = process.env.API_KEY || '';
 
-const ai = new GoogleGenAI({ apiKey });
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const analyzePortfolioChange = async (change: PortfolioChange): Promise<AIAnalysisResult> => {
-  if (!apiKey) {
+  if (!ai) {
     return {
       analysis: "API Key is missing. Cannot perform AI analysis.",
       sentiment: "Neutral"
