@@ -84,16 +84,15 @@ export const Importer: React.FC<ImporterProps> = ({ onImport, onGenerateDemo, on
         if (Array.isArray(parsed)) {
           // Basic validation
           if (parsed.length > 0 && (!parsed[0].id || !parsed[0].stocks)) {
-             throw new Error("Invalid format");
+             throw new Error("Invalid format: Missing id or stocks in snapshot");
           }
-          if (confirm(`Found ${parsed.length} snapshots. This will overwrite current history. Continue?`)) {
-            onRestore(parsed);
-          }
+          // Directly restore without confirmation as it's a deliberate action
+          onRestore(parsed);
         } else {
-          alert("Invalid file format: Expected an array of snapshots.");
+          setError("Invalid file format: Expected an array of snapshots.");
         }
       } catch (err) {
-        alert("Failed to parse file: " + err);
+        setError("Failed to parse file: " + err);
       }
       // Reset input
       if (fileInputRef.current) fileInputRef.current.value = '';

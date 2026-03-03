@@ -8,6 +8,7 @@ import { StockCard } from './components/StockCard';
 function App() {
   const [snapshots, setSnapshots] = useState<PortfolioSnapshot[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.DASHBOARD);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     // Load initial data
@@ -24,7 +25,7 @@ function App() {
   const handleRestore = (data: PortfolioSnapshot[]) => {
     const updated = restoreData(data);
     setSnapshots(updated);
-    alert("Data restored successfully!");
+    setViewMode(ViewMode.DASHBOARD);
   };
 
   const handleGenerateDemo = () => {
@@ -34,10 +35,9 @@ function App() {
   };
 
   const handleClear = () => {
-    if (confirm("Are you sure you want to delete all history?")) {
-      clearHistory();
-      setSnapshots([]);
-    }
+    clearHistory();
+    setSnapshots([]);
+    setShowResetConfirm(false);
   };
 
   // Derived state
@@ -275,12 +275,30 @@ function App() {
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-bold text-gray-900">Portfolio Timeline</h2>
-              <button 
-                onClick={handleClear}
-                className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline"
-              >
-                Reset History
-              </button>
+              {!showResetConfirm ? (
+                <button 
+                  onClick={() => setShowResetConfirm(true)}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline"
+                >
+                  Reset History
+                </button>
+              ) : (
+                <div className="flex items-center space-x-3 bg-red-50 px-3 py-1 rounded-lg border border-red-100">
+                  <span className="text-xs font-semibold text-red-800">Are you sure?</span>
+                  <button 
+                    onClick={handleClear}
+                    className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 transition-colors"
+                  >
+                    Yes, Delete
+                  </button>
+                  <button 
+                    onClick={() => setShowResetConfirm(false)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
             <HistoryTimeline snapshots={snapshots} />
           </div>
