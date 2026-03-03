@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ViewMode, PortfolioSnapshot, Stock } from './types';
-import { getSnapshots, saveSnapshot, clearHistory, generateDemoData } from './services/storageService';
+import { getSnapshots, saveSnapshot, clearHistory, generateDemoData, restoreData } from './services/storageService';
 import { HistoryTimeline } from './components/HistoryTimeline';
 import { Importer } from './components/Importer';
 import { StockCard } from './components/StockCard';
@@ -19,6 +19,12 @@ function App() {
     const updated = saveSnapshot(newSnapshot);
     setSnapshots(updated);
     setViewMode(ViewMode.DASHBOARD);
+  };
+
+  const handleRestore = (data: PortfolioSnapshot[]) => {
+    const updated = restoreData(data);
+    setSnapshots(updated);
+    alert("Data restored successfully!");
   };
 
   const handleGenerateDemo = () => {
@@ -282,7 +288,11 @@ function App() {
 
         {viewMode === ViewMode.IMPORT && (
           <div className="max-w-3xl mx-auto pt-8">
-            <Importer onImport={handleImport} onGenerateDemo={handleGenerateDemo} />
+            <Importer 
+              onImport={handleImport} 
+              onGenerateDemo={handleGenerateDemo} 
+              onRestore={handleRestore}
+            />
           </div>
         )}
 

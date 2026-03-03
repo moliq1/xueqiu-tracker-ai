@@ -66,12 +66,7 @@ export const StockCard: React.FC<StockCardProps> = ({ stock, status = 'neutral' 
         </div>
       </div>
       
-      <div className="flex justify-between items-end border-t border-gray-100 pt-3">
-        <span className="text-lg font-semibold text-gray-800">
-          {stock.price ? `¥${stock.price.toFixed(2)}` : '--'}
-        </span>
-        
-        {/* Change Percent Removed as requested */}
+      <div className="flex justify-end items-center border-t border-gray-100 pt-3">
         {/* Link to Xueqiu Quote */}
         <a 
           href={`https://xueqiu.com/S/${stock.symbol}`} 

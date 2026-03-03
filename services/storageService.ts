@@ -24,6 +24,11 @@ export const clearHistory = () => {
   localStorage.removeItem(STORAGE_KEY);
 };
 
+export const restoreData = (snapshots: PortfolioSnapshot[]) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshots));
+  return snapshots;
+};
+
 // Helper to generate a unique ID
 export const generateId = () => Math.random().toString(36).substr(2, 9);
 
