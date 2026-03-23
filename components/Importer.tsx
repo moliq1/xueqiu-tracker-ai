@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Stock, PortfolioSnapshot } from '../types';
 import { generateId, getSnapshots } from '../services/storageService';
+import { GistSyncPanel } from './GistSyncPanel';
 
 interface ImporterProps {
   onImport: (snapshot: PortfolioSnapshot) => void;
@@ -11,7 +12,7 @@ interface ImporterProps {
 export const Importer: React.FC<ImporterProps> = ({ onImport, onGenerateDemo, onRestore }) => {
   const [textInput, setTextInput] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'manual' | 'script' | 'backup'>('script');
+  const [activeTab, setActiveTab] = useState<'manual' | 'script' | 'backup' | 'cloud'>('script');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleParse = () => {
@@ -176,6 +177,12 @@ export const Importer: React.FC<ImporterProps> = ({ onImport, onGenerateDemo, on
         >
           Backup & Restore
         </button>
+        <button
+          className={`pb-2 px-4 text-sm font-medium transition-colors ${activeTab === 'cloud' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('cloud')}
+        >
+          Cloud Sync
+        </button>
       </div>
 
       {activeTab === 'script' && (
@@ -279,12 +286,12 @@ export const Importer: React.FC<ImporterProps> = ({ onImport, onGenerateDemo, on
             <div className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
               <h4 className="font-semibold text-gray-900 mb-2">Import Data</h4>
               <p className="text-xs text-gray-500 mb-4">Restore history from a backup file.</p>
-              <input 
-                type="file" 
-                accept=".json" 
+              <input
+                type="file"
+                accept=".json"
                 ref={fileInputRef}
                 onChange={handleImportFile}
-                className="hidden" 
+                className="hidden"
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -306,6 +313,10 @@ export const Importer: React.FC<ImporterProps> = ({ onImport, onGenerateDemo, on
             </button>
           </div>
         </div>
+      )}
+
+      {activeTab === 'cloud' && (
+        <GistSyncPanel onDataRestored={() => onRestore(getSnapshots())} />
       )}
     </div>
   );
