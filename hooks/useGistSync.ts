@@ -10,7 +10,9 @@ import {
   pushToGist,
   pullFromGist,
   detectConflict,
-  mergeSnapshots
+  mergeSnapshots,
+  linkExistingGist,
+  getActiveAccount as getStoredActiveAccount
 } from '../services/gistService';
 import { getSnapshots, restoreData } from '../services/storageService';
 
@@ -26,6 +28,7 @@ interface UseGistSyncReturn {
   addNewAccount: (name: string, token: string) => Promise<{ success: boolean; error?: string }>;
   removeAccountById: (id: string) => void;
   switchAccount: (id: string) => void;
+  linkGist: (gistId: string) => Promise<{ success: boolean; error?: string }>;
 
   // Sync operations
   push: () => Promise<SyncResult>;
@@ -75,6 +78,18 @@ export const useGistSync = (): UseGistSyncReturn => {
     setActiveAccount(id);
     loadAccounts();
   }, [loadAccounts]);
+
+  const linkGist = useCallback(async (gistId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!activeAccount) {
+      return { success: false, error: 'No active account.' };
+    }
+
+    const result = await linkExistingGist(activeAccount, gistId);
+    if (result.success) {
+      loadAccounts();
+    }
+    return result;
+  }, [activeAccount, loadAccounts]);
 
   const push = useCallback(async (): Promise<SyncResult> => {
     if (!activeAccount) {
@@ -242,6 +257,7 @@ export const useGistSync = (): UseGistSyncReturn => {
     addNewAccount,
     removeAccountById,
     switchAccount,
+    linkGist,
     push,
     pull,
     smartSync,

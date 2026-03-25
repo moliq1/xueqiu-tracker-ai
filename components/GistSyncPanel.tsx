@@ -16,6 +16,7 @@ export const GistSyncPanel: React.FC<GistSyncPanelProps> = ({ onDataRestored }) 
     addNewAccount,
     removeAccountById,
     switchAccount,
+    linkGist,
     push,
     pull,
     smartSync,
@@ -28,6 +29,9 @@ export const GistSyncPanel: React.FC<GistSyncPanelProps> = ({ onDataRestored }) 
   const [newAccountName, setNewAccountName] = useState('');
   const [newToken, setNewToken] = useState('');
   const [addError, setAddError] = useState('');
+  const [showLinkGist, setShowLinkGist] = useState<string | null>(null);
+  const [gistIdInput, setGistIdInput] = useState('');
+  const [linkError, setLinkError] = useState('');
 
   useEffect(() => {
     loadAccounts();
@@ -75,6 +79,22 @@ export const GistSyncPanel: React.FC<GistSyncPanelProps> = ({ onDataRestored }) 
     const result = await resolveConflict(resolution);
     if (result.success) {
       onDataRestored();
+    }
+  };
+
+  const handleLinkGist = async (accountId: string) => {
+    if (!gistIdInput.trim()) {
+      setLinkError('Please enter a Gist ID.');
+      return;
+    }
+
+    const result = await linkGist(gistIdInput.trim());
+    if (result.success) {
+      setShowLinkGist(null);
+      setGistIdInput('');
+      setLinkError('');
+    } else {
+      setLinkError(result.error || 'Failed to link Gist.');
     }
   };
 
@@ -166,32 +186,83 @@ export const GistSyncPanel: React.FC<GistSyncPanelProps> = ({ onDataRestored }) 
             {accounts.map(account => (
               <div
                 key={account.id}
-                className={`p-3 border rounded-lg flex items-center justify-between ${
+                className={`p-3 border rounded-lg ${
                   account.isActive ? 'border-blue-300 bg-blue-50' : 'border-gray-200'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    checked={account.isActive}
-                    onChange={() => switchAccount(account.id)}
-                    className="h-4 w-4 text-blue-600"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900">{account.name}</p>
-                    {account.lastSync && (
-                      <p className="text-xs text-gray-500">
-                        Last sync: {formatDate(account.lastSync)}
-                      </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      checked={account.isActive}
+                      onChange={() => switchAccount(account.id)}
+                      className="h-4 w-4 text-blue-600"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">{account.name}</p>
+                      {account.gistId ? (
+                        <p className="text-xs text-gray-500">
+                          Gist: {account.gistId.substring(0, 8)}...
+                          {account.lastSync && ` • Last sync: ${formatDate(account.lastSync)}`}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-orange-600">No Gist linked</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!account.gistId && (
+                      <button
+                        onClick={() => setShowLinkGist(account.id)}
+                        className="text-blue-500 hover:text-blue-700 text-sm"
+                      >
+                        Link Gist
+                      </button>
                     )}
+                    <button
+                      onClick={() => removeAccountById(account.id)}
+                      className="text-red-500 hover:text-red-700 text-sm"
+                    >
+                      Remove
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => removeAccountById(account.id)}
-                  className="text-red-500 hover:text-red-700 text-sm"
-                >
-                  Remove
-                </button>
+
+                {/* Link Gist Form */}
+                {showLinkGist === account.id && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <label className="block text-sm text-gray-700 mb-1">Existing Gist ID</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={gistIdInput}
+                        onChange={(e) => setGistIdInput(e.target.value)}
+                        placeholder="e.g., abc123def456..."
+                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <button
+                        onClick={() => handleLinkGist(account.id)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm py-1 px-3 rounded"
+                      >
+                        Link
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowLinkGist(null);
+                          setGistIdInput('');
+                          setLinkError('');
+                        }}
+                        className="text-gray-500 hover:text-gray-700 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {linkError && <p className="text-xs text-red-600 mt-1">{linkError}</p>}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Find your Gist ID in the URL: github.com/username/gist/<strong>ID</strong>
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
 

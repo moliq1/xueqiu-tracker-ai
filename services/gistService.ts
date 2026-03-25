@@ -143,9 +143,44 @@ export const createGist = async (account: GistAccount, snapshots: PortfolioSnaps
   }
 };
 
+export const validateGistId = async (token: string, gistId: string): Promise<{ valid: boolean; error?: string }> => {
+  try {
+    const response = await fetch(`${GIST_API_BASE}/${gistId}`, {
+      headers: getHeaders(token)
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const file = data.files?.[GIST_FILE_NAME];
+      if (!file) {
+        return { valid: false, error: `Gist does not contain ${GIST_FILE_NAME} file.` };
+      }
+      return { valid: true };
+    } else if (response.status === 404) {
+      return { valid: false, error: 'Gist not found. Please check the ID.' };
+    } else if (response.status === 401) {
+      return { valid: false, error: 'No access to this Gist or invalid token.' };
+    } else {
+      return { valid: false, error: `Error: ${response.status} ${response.statusText}` };
+    }
+  } catch (error) {
+    return { valid: false, error: 'Network error. Please check your connection.' };
+  }
+};
+
+export const linkExistingGist = async (account: GistAccount, gistId: string): Promise<{ success: boolean; error?: string }> => {
+  const validation = await validateGistId(account.token, gistId);
+  if (!validation.valid) {
+    return { success: false, error: validation.error };
+  }
+
+  updateAccountGist(account.id, gistId);
+  return { success: true };
+};
+
 export const getGistContent = async (account: GistAccount): Promise<{ success: boolean; content?: GistContent; error?: string }> => {
   if (!account.gistId) {
-    return { success: false, error: 'No Gist ID configured. Push first to create.' };
+    return { success: false, error: 'No Gist ID configured. Link an existing Gist or Push first to create.' };
   }
 
   try {
