@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PortfolioSnapshot, PortfolioChange } from '../types';
+import { PortfolioSnapshot, PortfolioChange, StockRankChange } from '../types';
 import { StockCard } from './StockCard';
 import { analyzePortfolioChange } from '../services/geminiService';
 
@@ -7,9 +7,44 @@ interface HistoryTimelineProps {
   snapshots: PortfolioSnapshot[];
 }
 
+const RANK_CHANGE_THRESHOLD = 10;
+
+const RankChangeCard: React.FC<{ change: StockRankChange; direction: 'up' | 'down' }> = ({ change, direction }) => {
+  const toneClasses = direction === 'up'
+    ? 'border-emerald-200 bg-emerald-50/60 text-emerald-700'
+    : 'border-amber-200 bg-amber-50/60 text-amber-700';
+  const label = direction === 'up' ? 'UP' : 'DOWN';
+  const delta = direction === 'up' ? `+${change.delta}` : `${change.delta}`;
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h5 className="font-semibold text-gray-900">{change.stock.name}</h5>
+          <p className="text-xs font-mono text-gray-500">{change.stock.symbol}</p>
+        </div>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${toneClasses}`}>
+          {label} {delta}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3 text-xs text-gray-600">
+        <div>
+          <p className="uppercase tracking-wide text-gray-400">Previous</p>
+          <p className="mt-1 font-semibold text-gray-900">#{change.previousRank}</p>
+        </div>
+        <div>
+          <p className="uppercase tracking-wide text-gray-400">Current</p>
+          <p className="mt-1 font-semibold text-gray-900">#{change.currentRank}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({ snapshots }) => {
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
   const [analyses, setAnalyses] = useState<Record<string, { text: string; sentiment: string }>>({});
+  const [expandedRankSignals, setExpandedRankSignals] = useState<Set<string>>(new Set());
 
   // Compute diffs
   const changes: PortfolioChange[] = [];
@@ -21,16 +56,34 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({ snapshots }) =
 
     const currentSymbols = new Set(current.stocks.map(s => s.symbol));
     const previousSymbols = new Set(previous.stocks.map(s => s.symbol));
+    const previousRankMap = new Map(previous.stocks.map((stock, index) => [stock.symbol, index + 1]));
 
     const added = current.stocks.filter(s => !previousSymbols.has(s.symbol));
     const removed = previous.stocks.filter(s => !currentSymbols.has(s.symbol));
     const retained = current.stocks.filter(s => previousSymbols.has(s.symbol));
+    const rankChanges = retained
+      .map((stock, index) => {
+        const previousRank = previousRankMap.get(stock.symbol);
+        if (!previousRank) return null;
+
+        return {
+          stock,
+          previousRank,
+          currentRank: index + 1,
+          delta: previousRank - (index + 1)
+        };
+      })
+      .filter((change): change is StockRankChange => change !== null);
+    const movedUp = rankChanges.filter(change => change.delta >= RANK_CHANGE_THRESHOLD);
+    const movedDown = rankChanges.filter(change => change.delta <= -RANK_CHANGE_THRESHOLD);
 
     changes.push({
       date: current.date,
       added,
       removed,
-      retained
+      retained,
+      movedUp,
+      movedDown
     });
   }
 
@@ -54,6 +107,18 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({ snapshots }) =
     });
   };
 
+  const toggleRankSignals = (changeId: string) => {
+    setExpandedRankSignals(prev => {
+      const next = new Set(prev);
+      if (next.has(changeId)) {
+        next.delete(changeId);
+      } else {
+        next.add(changeId);
+      }
+      return next;
+    });
+  };
+
   if (snapshots.length < 2) {
     return (
       <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
@@ -70,6 +135,13 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({ snapshots }) =
         const hasAnalysis = !!analyses[changeId];
         const isAnalyzing = analyzingIds.has(changeId);
         const sentiment = analyses[changeId]?.sentiment;
+        const rankSignalCount = change.movedUp.length + change.movedDown.length;
+        const showRankSignals = expandedRankSignals.has(changeId);
+        const hasMeaningfulChanges =
+          change.added.length > 0 ||
+          change.removed.length > 0 ||
+          change.movedUp.length > 0 ||
+          change.movedDown.length > 0;
 
         let sentimentColor = 'bg-gray-100 text-gray-600';
         if (sentiment === 'Bullish') sentimentColor = 'bg-red-100 text-red-700'; // Red is up in China
@@ -91,29 +163,72 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({ snapshots }) =
                 </p>
               </div>
 
-              {!hasAnalysis && (change.added.length > 0 || change.removed.length > 0) && (
-                 <button
-                 onClick={() => handleAnalyze(change, idx)}
-                 disabled={isAnalyzing}
-                 className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-medium rounded-lg shadow-sm hover:shadow-md disabled:opacity-50 transition-all"
-               >
-                 {isAnalyzing ? (
-                   <>
-                     <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                     </svg>
-                     <span>Analyst Thinking...</span>
-                   </>
-                 ) : (
-                   <>
-                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                     <span>Ask AI Analyst</span>
-                   </>
-                 )}
-               </button>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {rankSignalCount > 0 && (
+                  <button
+                    onClick={() => toggleRankSignals(changeId)}
+                    className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    {showRankSignals ? 'Hide Rank Signals' : `View Rank Signals (${rankSignalCount})`}
+                  </button>
+                )}
+
+                {!hasAnalysis && hasMeaningfulChanges && (
+                  <button
+                    onClick={() => handleAnalyze(change, idx)}
+                    disabled={isAnalyzing}
+                    className="flex items-center space-x-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:shadow-md disabled:opacity-50"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Analyst Thinking...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        <span>Ask AI Analyst</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {showRankSignals && rankSignalCount > 0 && (
+              <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+                {change.movedUp.length > 0 && (
+                  <div className="rounded-lg border border-emerald-100 bg-emerald-50/30 p-4">
+                    <h4 className="mb-3 flex items-center text-xs font-bold uppercase tracking-wider text-emerald-700">
+                      <span className="mr-2 h-2 w-2 rounded-full bg-emerald-500"></span>
+                      Ranking Up
+                    </h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {change.movedUp.map(rankChange => (
+                        <RankChangeCard key={`${rankChange.stock.symbol}-up`} change={rankChange} direction="up" />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {change.movedDown.length > 0 && (
+                  <div className="rounded-lg border border-amber-100 bg-amber-50/40 p-4">
+                    <h4 className="mb-3 flex items-center text-xs font-bold uppercase tracking-wider text-amber-700">
+                      <span className="mr-2 h-2 w-2 rounded-full bg-amber-500"></span>
+                      Ranking Down
+                    </h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {change.movedDown.map(rankChange => (
+                        <RankChangeCard key={`${rankChange.stock.symbol}-down`} change={rankChange} direction="down" />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* AI Analysis Box */}
             {hasAnalysis && (
@@ -163,7 +278,7 @@ export const HistoryTimeline: React.FC<HistoryTimelineProps> = ({ snapshots }) =
               )}
             </div>
             
-            {change.added.length === 0 && change.removed.length === 0 && (
+            {!hasMeaningfulChanges && (
                <div className="text-sm text-gray-400 italic">No changes made to the portfolio on this day.</div>
             )}
           </div>

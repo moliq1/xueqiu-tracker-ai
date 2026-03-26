@@ -14,11 +14,20 @@ export interface PortfolioSnapshot {
   notes?: string;
 }
 
+export interface StockRankChange {
+  stock: Stock;
+  previousRank: number;
+  currentRank: number;
+  delta: number;
+}
+
 export interface PortfolioChange {
   date: string;
   added: Stock[];
   removed: Stock[];
   retained: Stock[];
+  movedUp: StockRankChange[];
+  movedDown: StockRankChange[];
   aiAnalysis?: string;
 }
 

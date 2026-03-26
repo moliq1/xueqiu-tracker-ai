@@ -15,8 +15,19 @@ export const analyzePortfolioChange = async (change: PortfolioChange): Promise<A
 
   const addedNames = change.added.map(s => `${s.name} (${s.symbol})`).join(', ');
   const removedNames = change.removed.map(s => `${s.name} (${s.symbol})`).join(', ');
+  const movedUpNames = change.movedUp
+    .map(item => `${item.stock.name} (${item.stock.symbol}) #${item.previousRank}→#${item.currentRank}`)
+    .join(', ');
+  const movedDownNames = change.movedDown
+    .map(item => `${item.stock.name} (${item.stock.symbol}) #${item.previousRank}→#${item.currentRank}`)
+    .join(', ');
   
-  if (change.added.length === 0 && change.removed.length === 0) {
+  if (
+    change.added.length === 0 &&
+    change.removed.length === 0 &&
+    change.movedUp.length === 0 &&
+    change.movedDown.length === 0
+  ) {
     return {
       analysis: "No changes detected in the portfolio today. The investor is holding their position.",
       sentiment: "Neutral"
@@ -30,9 +41,12 @@ export const analyzePortfolioChange = async (change: PortfolioChange): Promise<A
     
     ADDED STOCKS: ${addedNames || 'None'}
     REMOVED STOCKS: ${removedNames || 'None'}
+    RANKING UP (higher priority signal, not proof of bullishness): ${movedUpNames || 'None'}
+    RANKING DOWN (lower priority signal, not proof of bearishness): ${movedDownNames || 'None'}
     
-    Please provide a concise analysis (max 100 words) of what this shift might imply about their strategy. 
-    Are they moving to defensive sectors? Taking profits? Betting on tech?
+    Please provide a concise analysis (max 100 words) of what this shift might imply about their strategy.
+    Treat ranking changes as an attention or priority signal only. Do not equate ranking up directly with bullishness or ranking down directly with bearishness.
+    Weigh ranking changes together with additions and removals when inferring strategy.
     
     Also classify the sentiment of this move as: Bullish, Bearish, Neutral, or Defensive.
   `;
