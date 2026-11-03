@@ -53,8 +53,7 @@ export function applyDailySnapshot(history, stocks, userId, now, allowLargeDrop 
     throw new Error('No stocks to save.');
   }
 
-  const prior = [...history].sort((a, b) => b.timestamp - a.timestamp)
-    .find((snapshot) => snapshot.id !== 'auto-xueqiu-' + userId + '-' + beijingDay(now));
+  const prior = [...history].sort((a, b) => b.timestamp - a.timestamp)[0];
   if (!allowLargeDrop && prior && prior.stocks.length >= 10 && stocks.length < prior.stocks.length * 0.5) {
     throw new Error('Stock count dropped by over 50%; refusing potentially incomplete crawl. Inspect manually; set ALLOW_LARGE_DROP=true only if confirmed.');
   }
