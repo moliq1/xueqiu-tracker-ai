@@ -7,9 +7,10 @@ interface ImporterProps {
   onImport: (snapshot: PortfolioSnapshot) => void;
   onGenerateDemo: () => void;
   onRestore: (data: PortfolioSnapshot[]) => void;
+  snapshots: PortfolioSnapshot[];
 }
 
-export const Importer: React.FC<ImporterProps> = ({ onImport, onGenerateDemo, onRestore }) => {
+export const Importer: React.FC<ImporterProps> = ({ onImport, onGenerateDemo, onRestore, snapshots }) => {
   const [textInput, setTextInput] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'manual' | 'script' | 'backup' | 'cloud'>('script');
@@ -60,7 +61,7 @@ export const Importer: React.FC<ImporterProps> = ({ onImport, onGenerateDemo, on
   };
 
   const handleExport = () => {
-    const data = getSnapshots();
+    const data = snapshots;
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
