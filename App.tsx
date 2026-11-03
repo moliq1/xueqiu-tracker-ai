@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ViewMode, PortfolioSnapshot, Stock } from './types';
 import { getSnapshots, saveSnapshot, clearHistory, generateDemoData, restoreData } from './services/storageService';
 import { HistoryTimeline } from './components/HistoryTimeline';
@@ -6,39 +6,72 @@ import { Importer } from './components/Importer';
 import { StockCard } from './components/StockCard';
 
 function App() {
-  const [snapshots, setSnapshots] = useState<PortfolioSnapshot[]>([]);
+  const [localSnapshots, setLocalSnapshots] = useState<PortfolioSnapshot[]>([]);
+  const [autoSnapshots, setAutoSnapshots] = useState<PortfolioSnapshot[]>([]);
+  const [autoStatus, setAutoStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.DASHBOARD);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
-    // Load initial data
-    const loaded = getSnapshots();
-    setSnapshots(loaded);
+    setLocalSnapshots(getSnapshots());
+
+    let cancelled = false;
+    // public/ is copied to the Vite base path when GitHub Pages is deployed.
+    fetch(import.meta.env.BASE_URL + 'data/auto-snapshots.json?ts=' + Date.now(), {
+      cache: 'no-store'
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('Automatic snapshot feed unavailable.');
+        return response.json();
+      })
+      .then((data: unknown) => {
+        if (!Array.isArray(data) || !data.every((item) =>
+          item && typeof item.id === 'string' && Number.isFinite(item.timestamp) &&
+          Array.isArray(item.stocks)
+        )) {
+          throw new Error('Invalid automatic snapshot feed.');
+        }
+        if (!cancelled) {
+          setAutoSnapshots(data as PortfolioSnapshot[]);
+          setAutoStatus('ready');
+        }
+      })
+      .catch((error) => {
+        console.warn('Automatic snapshots could not be loaded:', error);
+        if (!cancelled) setAutoStatus('unavailable');
+      });
+
+    return () => { cancelled = true; };
   }, []);
 
   const handleImport = (newSnapshot: PortfolioSnapshot) => {
-    const updated = saveSnapshot(newSnapshot);
-    setSnapshots(updated);
+    setLocalSnapshots(saveSnapshot(newSnapshot));
     setViewMode(ViewMode.DASHBOARD);
   };
 
   const handleRestore = (data: PortfolioSnapshot[]) => {
-    const updated = restoreData(data);
-    setSnapshots(updated);
+    setLocalSnapshots(restoreData(data));
     setViewMode(ViewMode.DASHBOARD);
   };
 
   const handleGenerateDemo = () => {
-    const demo = generateDemoData();
-    setSnapshots(demo);
+    setLocalSnapshots(generateDemoData());
     setViewMode(ViewMode.DASHBOARD);
   };
 
   const handleClear = () => {
     clearHistory();
-    setSnapshots([]);
+    setLocalSnapshots([]);
     setShowResetConfirm(false);
   };
+
+  // Keep local/private history and public automated snapshots separate.
+  const snapshots = useMemo(() => {
+    const byId = new Map<string, PortfolioSnapshot>();
+    localSnapshots.forEach((snapshot) => byId.set(snapshot.id, snapshot));
+    autoSnapshots.forEach((snapshot) => byId.set(snapshot.id, snapshot));
+    return Array.from(byId.values()).sort((a, b) => b.timestamp - a.timestamp);
+  }, [localSnapshots, autoSnapshots]);
 
   // Derived state
   const latestSnapshot = snapshots.length > 0 ? snapshots[0] : null;
@@ -137,6 +170,15 @@ function App() {
                 <h2 className="text-2xl font-bold">Portfolio Overview</h2>
                 <p className="text-slate-400 mt-1">
                   Tracking User: <span className="text-white font-mono font-semibold">sth_</span>
+                </p>
+                <p className="text-xs text-slate-400 mt-2">
+                  {autoSnapshots.length > 0
+                    ? 'Automatic daily history: ' + autoSnapshots.length + ' snapshot(s)'
+                    : autoStatus === 'loading'
+                      ? 'Loading automatic history...'
+                      : autoStatus === 'ready'
+                        ? 'Automatic history: awaiting first successful run'
+                        : 'Automatic history unavailable; local history remains accessible'}
                 </p>
                 <div className="mt-4 flex items-center space-x-6">
                   <div>
@@ -280,11 +322,11 @@ function App() {
                   onClick={() => setShowResetConfirm(true)}
                   className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline"
                 >
-                  Reset History
+                  Clear Local History
                 </button>
               ) : (
                 <div className="flex items-center space-x-3 bg-red-50 px-3 py-1 rounded-lg border border-red-100">
-                  <span className="text-xs font-semibold text-red-800">Are you sure?</span>
+                  <span className="text-xs font-semibold text-red-800">Clear browser-only history? Automated snapshots are retained.</span>
                   <button 
                     onClick={handleClear}
                     className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700 transition-colors"
@@ -310,6 +352,7 @@ function App() {
               onImport={handleImport} 
               onGenerateDemo={handleGenerateDemo} 
               onRestore={handleRestore}
+              snapshots={snapshots}
             />
           </div>
         )}
